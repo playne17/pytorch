@@ -1359,7 +1359,7 @@ class TestTensorCreation(TestCase):
     def test_meshgrid_empty(self):
         with self.assertRaisesRegex(RuntimeError,
                                     'expects a non-empty TensorList'):
-            torch.meshgrid(indexing='xy')
+            torch.meshgrid()
 
     def test_meshgrid_unsupported_indexing(self):
         with self.assertRaisesRegex(RuntimeError,
@@ -1370,27 +1370,48 @@ class TestTensorCreation(TestCase):
     def test_meshgrid_non_1d_tensor(self):
         with self.assertRaisesRegex(RuntimeError,
                                     'Expected 0D or 1D tensor'):
-            torch.meshgrid(torch.tensor([[1, 2], [3, 4]]),
-                           indexing='xy')
+            torch.meshgrid(torch.tensor([[1, 2], [3, 4]]))
 
     def test_meshgrid_inconsistent_dtype(self):
         with self.assertRaisesRegex(
                 RuntimeError, 'expects all tensors to have the same dtype'):
             torch.meshgrid(torch.tensor([1], dtype=torch.int),
-                           torch.tensor([2], dtype=torch.float),
-                           indexing='xy')
+                           torch.tensor([2], dtype=torch.float))
 
     def test_meshgrid_inconsistent_device(self):
         with self.assertRaisesRegex(
                 RuntimeError, 'expects all tensors to have the same device'):
             torch.meshgrid(torch.tensor([1], device='cpu'),
-                           torch.tensor([2], device='meta'),
-                           indexing='xy')
+                           torch.tensor([2], device='meta'))
 
-    def test_meshgrid_requires_indexing(self):
-        with self.assertRaisesRegex(RuntimeError,
-                                    'the "indexing" parameter is required'):
-            torch.meshgrid(torch.tensor([1, 2]))
+
+    def test_meshgrid_default_indexing(self, device):
+        a = torch.tensor(1, device=device)
+        b = torch.tensor([1, 2, 3], device=device)
+        c = torch.tensor([1, 2], device=device)
+        grid_a, grid_b, grid_c = torch.meshgrid([a, b, c])
+        self.assertEqual(grid_a.shape, torch.Size([3, 1, 2]))
+        self.assertEqual(grid_b.shape, torch.Size([3, 1, 2]))
+        self.assertEqual(grid_c.shape, torch.Size([3, 1, 2]))
+        grid_a2, grid_b2, grid_c2 = torch.meshgrid(a, b, c)
+        self.assertEqual(grid_a2.shape, torch.Size([3, 1, 2]))
+        self.assertEqual(grid_b2.shape, torch.Size([3, 1, 2]))
+        self.assertEqual(grid_c2.shape, torch.Size([3, 1, 2]))
+        # Default is "xy" indexing, so the first index corresponds to
+        # the second input.
+        expected_grid_a = torch.ones(3, 1, 2, dtype=torch.int64, device=device)
+        expected_grid_b = torch.tensor([[[1, 1]],
+                                        [[2, 2]],
+                                        [[3, 3]]], device=device)
+        expected_grid_c = torch.tensor([[[1, 2]],
+                                        [[1, 2]],
+                                        [[1, 2]]], device=device)
+        self.assertTrue(grid_a.equal(expected_grid_a))
+        self.assertTrue(grid_b.equal(expected_grid_b))
+        self.assertTrue(grid_c.equal(expected_grid_c))
+        self.assertTrue(grid_a2.equal(expected_grid_a))
+        self.assertTrue(grid_b2.equal(expected_grid_b))
+        self.assertTrue(grid_c2.equal(expected_grid_c))
 
     def test_meshgrid_xy_indexing(self, device):
         a = torch.tensor(1, device=device)
@@ -1443,6 +1464,16 @@ class TestTensorCreation(TestCase):
         self.assertTrue(grid_a2.equal(expected_grid_a))
         self.assertTrue(grid_b2.equal(expected_grid_b))
         self.assertTrue(grid_c2.equal(expected_grid_c))
+
+    def test_meshgrid_xy_indexing_is_default(self, device):
+        a = torch.tensor(1, device=device)
+        b = torch.tensor([1, 2, 3], device=device)
+        c = torch.tensor([1, 2], device=device)
+        grid_a, grid_b, grid_c = torch.meshgrid(a, b, c, indexing='xy')
+        grid_a2, grid_b2, grid_c2 = torch.meshgrid(a, b, c)
+        self.assertTrue(grid_a.equal(grid_a2))
+        self.assertTrue(grid_b.equal(grid_b2))
+        self.assertTrue(grid_c.equal(grid_c2))
 
     def test_cartesian_prod(self, device):
         a = torch.tensor([1], device=device)
